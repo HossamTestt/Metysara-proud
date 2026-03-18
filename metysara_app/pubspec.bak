@@ -1,0 +1,45 @@
+name: metysara_app
+description: "A new Flutter project for Metysara booking application."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.6
+  
+  # State Management
+  flutter_riverpod: ^2.5.1
+  
+  # Navigation
+  go_router: ^14.0.0
+
+  # Firebase
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
+  cloud_firestore: ^5.0.0
+
+  # Code Generation / Models
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+
+  # UI / Utils
+  google_fonts: ^6.2.1
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.9
+  json_serializable: ^6.7.0
+
+flutter:
+  uses-material-design: true
+  generate: true

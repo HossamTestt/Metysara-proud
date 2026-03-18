@@ -1,0 +1,69 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+    function isVendor() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "vendor";
+    }
+    function isOwner(ownerId) {
+      return request.auth != null && request.auth.uid == ownerId;
+    }
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      // Anyone can read user public profiles
+      allow read: if true;
+      // Users can only write their own profile, or Admins can write any
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // 2. Venues Collection
+    match /venues/{venueId} {
+      // Anyone can read venues
+      allow read: if true;
+      // Admins can do anything. Vendors can only update *their own* venue.
+      allow create: if isAdmin(); // Only admins can create new venues
+      allow update: if isAdmin() || (isVendor() && isOwner(resource.data.ownerId));
+      allow delete: if isAdmin();
+    }
+
+    // 3. Bookings Collection
+    match /bookings/{bookingId} {
+      // Users can read/write their own bookings. Vendors can read/update bookings for their venues. Admins can do anything.
+      allow read: if isAdmin() || isOwner(resource.data.customerId) || (isVendor() && isOwner(resource.data.vendorId));
+      allow create: if isAuthenticated(); // Any logged in user can request a booking
+      allow update: if isAdmin() || isOwner(resource.data.customerId) || (isVendor() && isOwner(resource.data.vendorId));
+      allow delete: if isAdmin();
+    }
+
+    // 4. Comments Collection
+    match /comments/{commentId} {
+      // Anyone can read comments
+      allow read: if true;
+      // Only authenticated users can leave a comment
+      allow create: if isAuthenticated();
+      // Only the author or admin can edit/delete
+      allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+    }
+
+    // 5. Support Tickets & Notifications (Sprint 4)
+    match /tickets/{ticketId} {
+      allow read, update: if isAdmin() || isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+    
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAdmin() || isVendor(); // System generated
+    }
+  }
+}

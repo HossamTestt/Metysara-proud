@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "427456660895",
+    "project_id": "metysara-prod",
+    "storage_bucket": "metysara-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:427456660895:android:26bf1d91a36b6b584fa9aa",
+        "android_client_info": {
+          "package_name": "com.metysara.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkpw4ww1P8FbiYinhQvbRcNUd-BdJfllM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

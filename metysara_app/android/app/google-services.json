@@ -1,0 +1,134 @@
+{
+  "project_info": {
+    "project_number": "427456660895",
+    "project_id": "metysara-prod",
+    "storage_bucket": "metysara-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:427456660895:android:26bf1d91a36b6b584fa9aa",
+        "android_client_info": {
+          "package_name": "com.metysara.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "427456660895-ubtg6dds5j6kihq1q4e17jmlqq3jp8ho.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.metysara.app",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "427456660895-0ln4ca3qksb41dj4679l0ucrr8egu23k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkpw4ww1P8FbiYinhQvbRcNUd-BdJfllM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "427456660895-0ln4ca3qksb41dj4679l0ucrr8egu23k.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "427456660895-2rhm96a49ectp3vqiqq8hgompdtkujbk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.metysara.metysaraApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:427456660895:android:6dcc1bbd0dc1767c4fa9aa",
+        "android_client_info": {
+          "package_name": "com.metysara.metysara_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "427456660895-0ln4ca3qksb41dj4679l0ucrr8egu23k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkpw4ww1P8FbiYinhQvbRcNUd-BdJfllM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "427456660895-0ln4ca3qksb41dj4679l0ucrr8egu23k.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "427456660895-2rhm96a49ectp3vqiqq8hgompdtkujbk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.metysara.metysaraApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:427456660895:android:32af4b7e6233f11b4fa9aa",
+        "android_client_info": {
+          "package_name": "com.mycompany.metysara"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "427456660895-q4lb6ig0bb17iqcsmvtfu24opmufgt4u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mycompany.metysara",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "427456660895-0ln4ca3qksb41dj4679l0ucrr8egu23k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkpw4ww1P8FbiYinhQvbRcNUd-BdJfllM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "427456660895-0ln4ca3qksb41dj4679l0ucrr8egu23k.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "427456660895-2rhm96a49ectp3vqiqq8hgompdtkujbk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.metysara.metysaraApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

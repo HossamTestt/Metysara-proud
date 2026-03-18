@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Metysara</string>
+    <string name="title_activity_main">Metysara</string>
+    <string name="package_name">com.metysara.app</string>
+    <string name="custom_url_scheme">com.metysara.app</string>
+</resources>
