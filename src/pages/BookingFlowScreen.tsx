@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router';
-import { useVenues } from '../contexts/VenuesContext';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useVenues } from '../context/VenuesContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Button } from '../components/ui/button';
