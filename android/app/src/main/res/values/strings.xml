@@ -4,4 +4,7 @@
     <string name="title_activity_main">Metysara</string>
     <string name="package_name">com.metysara.app</string>
     <string name="custom_url_scheme">com.metysara.app</string>
+    <string name="facebook_app_id">777271685194675</string>
+    <string name="facebook_client_token">d091bae32dc111e74e3c24ba5a94115f</string>
+    <string name="fb_login_protocol_scheme">fb777271685194675</string>
 </resources>

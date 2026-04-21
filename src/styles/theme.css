@@ -200,6 +200,18 @@
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* CRITICAL: Prevent Android system font size setting from scaling app text */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Safe area inset for notch / status bar */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   /* Touch optimization */
@@ -225,5 +237,52 @@
 
   .slick-slider {
     touch-action: pan-y;
+  }
+
+  /* ─── Global Scrollbar Hiding (Mobile Polish) ─── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide ALL scrollbars on overflow elements for a native app feel */
+  [class*="overflow-x-auto"],
+  [class*="overflow-y-auto"],
+  [class*="overflow-auto"] {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  [class*="overflow-x-auto"]::-webkit-scrollbar,
+  [class*="overflow-y-auto"]::-webkit-scrollbar,
+  [class*="overflow-auto"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area bottom padding for fixed bottom nav */
+  .pb-safe {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  /* Smooth scroll everywhere */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Make tap targets minimum 44px (iOS HIG standard) */
+  button, a, [role="button"] {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Hide bottom nav bar when keyboard is open (screens smaller than 500px) */
+  @media (max-height: 500px) {
+    .bottom-nav-bar {
+      display: none !important;
+    }
   }
 }

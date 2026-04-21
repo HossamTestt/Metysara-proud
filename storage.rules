@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Helper: read user role from Firestore ───────────────────
+    function isAdmin() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isVendor() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'vendor';
+    }
+
+    // ── 1. Venue Images — vendors (50 MB) and admins (unlimited) ──
+    match /venue_images/{venueId}/{fileName} {
+      allow read: if true;
+
+      // Admins: no size or type restriction
+      allow write: if isAdmin();
+
+      // Vendors: up to 50 MB, images only
+      allow write: if isVendor()
+                   && request.resource.size <= 50 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // ── 2. Review Photos — authenticated users, up to 10 MB ───────
+    match /review_photos/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size <= 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // ── 3. Profile Photos — owner only, up to 5 MB ────────────────
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size <= 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // ── 4. Admin uploads — any path, no restrictions ──────────────
+    match /admin_uploads/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── 5. Fallback — block everything else (fail secure) ──────────
+    match /{allPaths=**} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}

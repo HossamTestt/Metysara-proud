@@ -1,3 +1,5 @@
+rootProject.name = "metysara_app_android"
+
 pluginManagement {
     val flutterSdkPath =
         run {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Metysara brand cream color - used as adaptive icon background -->
+    <color name="ic_launcher_background">#FAF7F2</color>
+    <!-- Primary brand gold -->
+    <color name="colorPrimary">#C9A96E</color>
+    <color name="colorPrimaryDark">#B8935A</color>
+    <color name="colorAccent">#C9A96E</color>
+</resources>

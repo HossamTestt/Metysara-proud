@@ -1,0 +1,11 @@
+{
+    "git.ignoreLimitWarning": true,
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-17",
+            "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.18.8-hotspot",
+            "default": true
+        }
+    ],
+    "java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.18.8-hotspot"
+}

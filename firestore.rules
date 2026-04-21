@@ -3,12 +3,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // ── Helper Functions ───────────────────────────────────────
     function isAdmin() {
       return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
     function isVendor() {
       return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "vendor";
+    }
+    function isSupport() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "support";
     }
     function isOwner(ownerId) {
       return request.auth != null && request.auth.uid == ownerId;
@@ -19,51 +22,90 @@ service cloud.firestore {
 
     // 1. Users Collection
     match /users/{userId} {
-      // Anyone can read user public profiles
-      allow read: if true;
-      // Users can only write their own profile, or Admins can write any
-      allow write: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated() || isAdmin();
+      allow create: if isOwner(userId) || isAdmin();
+      allow update: if isAdmin() || (isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])));
+      allow delete: if isAdmin();
     }
 
-    // 2. Venues Collection
+    // 2. Venues Collection — public read, controlled write
     match /venues/{venueId} {
-      // Anyone can read venues
-      allow read: if true;
-      // Admins can do anything. Vendors can only update *their own* venue.
-      allow create: if isAdmin(); // Only admins can create new venues
+      allow read: if true; 
+      allow create: if isAdmin();
+      // SECURITY FIX: Rating and reviews are now updated securely via Cloud Functions, not client-side.
       allow update: if isAdmin() || (isVendor() && isOwner(resource.data.ownerId));
       allow delete: if isAdmin();
     }
 
-    // 3. Bookings Collection
+    // 3. Bookings Collection — public availability check, restricted private details
     match /bookings/{bookingId} {
-      // Users can read/write their own bookings. Vendors can read/update bookings for their venues. Admins can do anything.
-      allow read: if isAdmin() || isOwner(resource.data.customerId) || (isVendor() && isOwner(resource.data.vendorId));
-      allow create: if isAuthenticated(); // Any logged in user can request a booking
-      allow update: if isAdmin() || isOwner(resource.data.customerId) || (isVendor() && isOwner(resource.data.vendorId));
+      // Root document stores only venueId, date, slot, status, and summary info.
+      // We allow all authenticated users to read/list for availability checks.
+      allow read, list: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || isSupport() 
+                    || (isAuthenticated() && request.auth.uid == resource.data.customerId)
+                    || (isVendor() && request.auth.uid == resource.data.vendorId);
       allow delete: if isAdmin();
+
+      // Nested subcollection for sensitive information
+      match /private_details/{detailId} {
+         // Only the customer, vendor, support, or admin can read sensitive details
+         allow read: if isAdmin() || isSupport()
+                     || (isAuthenticated() && request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.customerId)
+                     || (isVendor() && request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.vendorId);
+         allow create: if isAuthenticated();
+         allow update: if isAdmin() || isSupport()
+                       || (isAuthenticated() && request.auth.uid == get(/databases/$(database)/documents/bookings/$(bookingId)).data.customerId);
+         allow delete: if isAdmin();
+      }
     }
 
     // 4. Comments Collection
     match /comments/{commentId} {
-      // Anyone can read comments
-      allow read: if true;
-      // Only authenticated users can leave a comment
+      allow read: if true; 
       allow create: if isAuthenticated();
-      // Only the author or admin can edit/delete
-      allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+      allow update, delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
     }
 
-    // 5. Support Tickets & Notifications (Sprint 4)
+    // 5. Support Tickets
     match /tickets/{ticketId} {
-      allow read, update: if isAdmin() || isOwner(resource.data.userId);
+      allow read, update: if isAdmin() || isSupport()
+                           || (isAuthenticated() && request.auth.uid == resource.data.userId);
       allow create: if isAuthenticated();
       allow delete: if isAdmin();
     }
-    
+
+    // 6. Notifications — per-user only
     match /notifications/{notificationId} {
-      allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAdmin() || isVendor(); // System generated
+      allow read, update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin() || isSupport());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      // SECURITY FIX: Prevent users from sending fake notifications to other users
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid; 
+    }
+
+    // 7. Global Notifications (Admin broadcasts)
+    match /global_notifications/{docId} {
+      allow read: if isAdmin() || isSupport();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 8. App Settings & Legal Policies
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 9. Chats Collection (Live Support)
+    match /chats/{chatId} {
+      allow read, update: if isAuthenticated() && (request.auth.uid == chatId || isAdmin() || isSupport());
+      allow create: if isAuthenticated() && request.auth.uid == chatId;
+      allow delete: if isAdmin();
+      
+      match /messages/{messageId} {
+         allow read, create: if isAuthenticated() && (request.auth.uid == chatId || isAdmin() || isSupport());
+         allow delete: if isAdmin();
+      }
     }
   }
 }

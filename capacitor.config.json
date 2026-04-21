@@ -1,5 +1,32 @@
 {
   "appId": "com.metysara.app",
   "appName": "Metysara",
-  "webDir": "dist"
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#FAF7F2"
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "LIGHT",
+      "backgroundColor": "#FAF7F2"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "DARK",
+      "resizeOnFullScreen": true
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"],
+      "smallIcon": "ic_stat_notification",
+      "iconColor": "#D4AF37"
+    },
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com", "facebook.com"]
+    }
+  },
+  "server": {
+    "androidScheme": "https"
+  }
 }
