@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -11,38 +11,7 @@ import { useVenues } from '../context/VenuesContext';
 import { useLanguage } from '../context/LanguageContext';
 import { BottomNav } from '../components/layout/BottomNav';
 
-const egyptianCities = [
-  { 
-    name: 'Cairo', 
-    nameAr: 'القاهرة',
-    zones: ['Nasr City', 'New Cairo', 'Heliopolis', 'Maadi', 'Downtown', 'Zamalek']
-  },
-  { 
-    name: 'Giza', 
-    nameAr: 'الجيزة',
-    zones: ['Haram', 'October', 'Omranaia', 'Dokki', 'Mohandessin', 'Sheikh Zayed']
-  },
-  { 
-    name: 'Alexandria', 
-    nameAr: 'الإسكندرية',
-    zones: ['Stanley', 'Smouha', 'Sidi Gaber', 'Miami', 'Glim', 'Montazah']
-  },
-  { 
-    name: 'Beni Suef', 
-    nameAr: 'بني سويف',
-    zones: ['Downtown', 'Al Wadi', 'East District']
-  },
-  { 
-    name: 'Fayoum', 
-    nameAr: 'الفيوم',
-    zones: ['City Center', 'Ibshaway', 'Sinnuris']
-  },
-  { 
-    name: 'Minya', 
-    nameAr: 'المنيا',
-    zones: ['Downtown', 'West Minya', 'East Minya']
-  },
-];
+import { egyptianCities, venueSubTypes } from '../constants';
 
 export function SearchResultsScreen() {
   const { venues, savedVenues, toggleFavorite } = useVenues();
@@ -54,6 +23,7 @@ export function SearchResultsScreen() {
   const [minCapacity, setMinCapacity] = useState(0);
   const [sortBy, setSortBy] = useState('recommended');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedSubType, setSelectedSubType] = useState('All');
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -61,6 +31,7 @@ export function SearchResultsScreen() {
 
   const currentCityData = egyptianCities.find(c => c.name === selectedCity);
   const availableZones = currentCityData ? currentCityData.zones : [];
+  const availableSubTypes = typeFilter && venueSubTypes[typeFilter] ? venueSubTypes[typeFilter] : [];
 
   // Initialize from URL params
   useEffect(() => {
@@ -109,9 +80,24 @@ export function SearchResultsScreen() {
       (venue.location && venue.location.toLowerCase().includes(lSearch)) ||
       (venue.zone && venue.zone.toLowerCase().includes(lSearch));
     
-    const matchesType = !typeFilter || venue.type === typeFilter;
+    const categoryAliasMap: Record<string, string[]> = {
+      wedding: ['wedding', 'venue', 'event_hall'],
+      funeral: ['funeral'],
+      photographer: ['photographer'],
+      videographer: ['videographer'],
+      makeup: ['makeup'],
+      planner: ['planner'],
+      decor: ['decor'],
+      hair_styling: ['hair_styling'],
+      catering: ['catering'],
+      event_hall: ['event_hall', 'venue'],
+      photosession: ['photosession'],
+    };
+
+    const matchesType = !typeFilter || (categoryAliasMap[typeFilter] ?? [typeFilter]).includes(venue.type || 'venue');
+    const matchesSubType = selectedSubType === 'All' || venue.subType === selectedSubType;
     
-    return matchesCity && matchesZone && matchesPrice && matchesCapacity && matchesSearch && matchesType;
+    return matchesCity && matchesZone && matchesPrice && matchesCapacity && matchesSearch && matchesType && matchesSubType;
   });
 
   const sortedVenues = [...filteredVenues].sort((a, b) => {
@@ -130,10 +116,12 @@ export function SearchResultsScreen() {
     setMinCapacity(0);
     setSortBy('recommended');
     setSearchQuery('');
+    setSelectedSubType('All');
   };
 
   const hasActiveFilters = selectedCity !== 'All Cities' || 
     selectedZone !== 'All Zones' || 
+    selectedSubType !== 'All' ||
     priceRange[0] > 0 || 
     priceRange[1] < 500000 || 
     minCapacity > 0;
@@ -220,6 +208,26 @@ export function SearchResultsScreen() {
                   </div>
                 )}
 
+                {/* SubType Filter */}
+                {availableSubTypes.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-3">{t('Venue Type', 'نوع القاعة')}</label>
+                    <Select value={selectedSubType} onValueChange={setSelectedSubType}>
+                      <SelectTrigger className="h-12 rounded-xl">
+                        <SelectValue placeholder={t('Select Type', 'اختر النوع')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All">{t('All Types', 'جميع الأنواع')}</SelectItem>
+                        {availableSubTypes.map((st) => (
+                          <SelectItem key={st.id} value={st.id}>
+                            {language === 'ar' ? st.nameAr : st.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {/* Price Range */}
                 <div>
                   <label className="block text-sm font-semibold mb-3">
@@ -245,7 +253,7 @@ export function SearchResultsScreen() {
                     max={1000}
                     step={50}
                     value={[minCapacity]}
-                    onValueChange={(value) => setMinCapacity(value[0])}
+                    onValueChange={(value: number[]) => setMinCapacity(value[0])}
                     className="mt-2"
                   />
                 </div>
@@ -316,6 +324,12 @@ export function SearchResultsScreen() {
               <button onClick={() => setSelectedZone('All Zones')} className="hover:text-primary-foreground">×</button>
             </div>
           )}
+          {selectedSubType !== 'All' && (
+            <div className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm flex items-center gap-2">
+              {language === 'ar' ? availableSubTypes.find(st => st.id === selectedSubType)?.nameAr || selectedSubType : availableSubTypes.find(st => st.id === selectedSubType)?.name || selectedSubType}
+              <button onClick={() => setSelectedSubType('All')} className="hover:text-primary-foreground">×</button>
+            </div>
+          )}
           {(priceRange[0] > 0 || priceRange[1] < 500000) && (
             <div className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm flex items-center gap-2">
               {priceRange[0].toLocaleString()} - {priceRange[1].toLocaleString()} EGP
@@ -338,7 +352,8 @@ export function SearchResultsScreen() {
         {sortedVenues.map((venue) => (
           <Card
             key={venue.id}
-            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow animate-fade-up"
+            style={{ animationDelay: `${sortedVenues.indexOf(venue) * 0.05}s` }}
             onClick={() => navigate(`/venue/${venue.id}`)}
           >
             <div className="relative">
@@ -401,6 +416,16 @@ export function SearchResultsScreen() {
                 <span className="text-sm text-muted-foreground">
                   {t('Up to', 'حتى')} {venue.capacity} {t('guests', 'ضيف')}
                 </span>
+                {venue.subType && venueSubTypes[venue.type || 'wedding']?.find(st => st.id === venue.subType) && (
+                  <>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-sm text-muted-foreground">
+                      {language === 'ar' 
+                        ? venueSubTypes[venue.type || 'wedding']?.find(st => st.id === venue.subType)?.nameAr 
+                        : venueSubTypes[venue.type || 'wedding']?.find(st => st.id === venue.subType)?.name}
+                    </span>
+                  </>
+                )}
               </div>
 
               <div className="flex items-center justify-between">

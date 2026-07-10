@@ -8,6 +8,8 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { PullToRefresh } from './components/ui/PullToRefresh';
 import { Toaster } from 'sonner';
 
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+
 export default function App() {
   useEffect(() => {
     // Initialize Crashlytics
@@ -35,6 +37,17 @@ export default function App() {
     };
     initCrashlytics();
 
+    // CRITICAL: Block ALL text selection at the JavaScript level
+    // to prevent Android WebView black screen crash on long-press
+    const blockSelection = (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Allow selection only inside input/textarea so cursor still works
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+    };
+    document.addEventListener('selectstart', blockSelection);
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
     // Handle Android hardware back button
     const backListener = CapacitorApp.addListener('backButton', () => {
       const path = window.location.pathname;
@@ -58,24 +71,27 @@ export default function App() {
 
     return () => {
       backListener.then(l => l.remove());
+      document.removeEventListener('selectstart', blockSelection);
     };
   }, []);
 
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <VenuesProvider>
-          <Toaster richColors position="top-center" toastOptions={{ style: { whiteSpace: 'pre-line', wordBreak: 'break-word', padding: '16px' } }} />
-          <PullToRefresh>
-            <div className="min-h-screen bg-background overscroll-none selection:bg-primary/30">
-              {/* Mobile viewport container: responsive on mobile, centered on desktop */}
-              <div className="mx-auto w-full md:max-w-[430px] min-h-screen bg-background md:shadow-2xl relative overflow-hidden">
-                <RouterProvider router={router} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <LanguageProvider>
+          <VenuesProvider>
+            <Toaster richColors position="top-center" toastOptions={{ style: { whiteSpace: 'pre-line', wordBreak: 'break-word', padding: '16px' } }} />
+            <PullToRefresh>
+              <div className="min-h-screen bg-background overscroll-none">
+                {/* Mobile viewport container: responsive on mobile, centered on desktop */}
+                <div className="mx-auto w-full md:max-w-[430px] min-h-screen bg-background md:shadow-2xl relative overflow-x-hidden">
+                  <RouterProvider router={router} />
+                </div>
               </div>
-            </div>
-          </PullToRefresh>
-        </VenuesProvider>
-      </LanguageProvider>
-    </AuthProvider>
+            </PullToRefresh>
+          </VenuesProvider>
+        </LanguageProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

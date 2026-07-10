@@ -34,6 +34,7 @@ export function PaymentScreen() {
   const { getVenueById } = useVenues();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'venue' | null>(null);
 
   const venue = getVenueById(id || '');
 
@@ -53,33 +54,33 @@ export function PaymentScreen() {
         return;
       }
 
-      // Final race-condition check before creating booking
-      const q = query(collection(db, 'bookings'), where('venueId', '==', venue.id));
-      const snapshot = await getDocs(q);
-      const activeBookings = snapshot.docs.filter(d => {
-        const data = d.data();
-        const isSameSlot = data.date === dateParam && data.slot === slotParam;
-        const isBlocking = ['pending_vendor', 'pending_admin', 'confirmed'].includes(data.status);
-        return isSameSlot && isBlocking;
-      });
-
-      if (activeBookings.length > 0) {
-        toast.error(t(
-          'We apologise — this time slot was just booked by another user. Please choose a different date or slot.',
-          'نعتذر — تم حجز هذه الفترة للتو من قبل مستخدم آخر. يرجى اختيار تاريخ أو فترة مختلفة.'
-        ));
+      const phoneToValidate = customerPhoneParam || userData.phone || '';
+      const phoneRegex = /^01[0125][0-9]{8}$/;
+      if (!phoneRegex.test(phoneToValidate.trim())) {
+        toast.error(t('Invalid Egyptian mobile number. Please update your profile or go back.', 'رقم هاتف مصري غير صحيح. يرجى تحديث ملفك الشخصي أو الرجوع.'));
         setIsProcessing(false);
-        navigate(-2);
         return;
       }
 
-      // Generate Serial ID via Transaction
+      // Final race-condition check & booking creation via a single Transaction
+      const slotRef = doc(db, 'venue_slots', `${venue.id}_${dateParam}_${slotParam}`);
       const counterDocRef = doc(db, 'counters', 'booking_counters');
       const counterField = 'global_booking_count';
+      
+      const newBookingRef = doc(collection(db, 'bookings'));
+      const newPrivateDetailsRef = doc(collection(db, 'bookings', newBookingRef.id, 'private_details'));
 
       let newSerialId = '';
+      
       try {
         await runTransaction(db, async (transaction) => {
+          // 1. Check if the slot is already booked
+          const slotDoc = await transaction.get(slotRef);
+          if (slotDoc.exists()) {
+            throw new Error("ALREADY_BOOKED");
+          }
+
+          // 2. Generate Serial ID
           const counterDoc = await transaction.get(counterDocRef);
           let newCount = 1;
           if (!counterDoc.exists()) {
@@ -89,48 +90,64 @@ export function PaymentScreen() {
             newCount = (data[counterField] || 0) + 1;
             transaction.update(counterDocRef, { [counterField]: newCount });
           }
-          // Format as 1-00001, 1-00002, etc.
           newSerialId = `1-${String(newCount).padStart(5, '0')}`;
+
+          // 3. Lock the slot
+          transaction.set(slotRef, {
+            bookingId: newBookingRef.id,
+            customerId: currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+
+          // 4. Create the booking document
+          transaction.set(newBookingRef, {
+            serialId: newSerialId,
+            customerId: currentUser.uid,
+            vendorId: venue.ownerId || null,
+            venueId: venue.id,
+            venueName: venue.name,
+            venueNameAr: venue.nameAr,
+            venueImage: venue.images[0] || null,
+            date: dateParam,
+            slot: slotParam,
+            totalAmount: totalAmountParam,
+            depositAmount: depositAmountParam,
+            depositPaid: 0,           // No payment yet
+            paymentStatus: 'unpaid',  // Will become 'deposit_paid' after vendor confirms and customer pays
+            paymentMethod: paymentMethod,
+            status: 'pending_vendor', // Awaiting vendor/admin confirmation
+            createdAt: serverTimestamp(),
+            packageId: packageIdParam || null,
+            packageName: pkg ? pkg.name : null,
+            packageNameAr: pkg ? pkg.nameAr : null,
+            guests: guestsParam,
+          });
+
+          // 5. Save sensitive customer info in a private subcollection
+          transaction.set(newPrivateDetailsRef, {
+            type: 'contact',
+            customerName: customerNameParam || userData.name,
+            customerPhone: customerPhoneParam || userData.phone || '',
+            customerEmail: customerEmailParam,
+            notes: notesParam || '',
+            services: servicesParam ? servicesParam.split(',').filter(Boolean) : [],
+            createdAt: serverTimestamp(),
+          });
         });
-      } catch (err) {
-        console.error("Transaction failed: ", err);
-        newSerialId = `1-${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`;
+      } catch (err: any) {
+        if (err.message === "ALREADY_BOOKED") {
+          toast.error(t(
+            'We apologise — this time slot was just booked by another user. Please choose a different date or slot.',
+            'نعتذر — تم حجز هذه الفترة للتو من قبل مستخدم آخر. يرجى اختيار تاريخ أو فترة مختلفة.'
+          ));
+          setIsProcessing(false);
+          navigate(-2);
+          return;
+        }
+        throw err;
       }
 
-      // Create booking with pending_vendor status (no payment yet)
-      // We separate public availability info (root) from private contact info (subcollection)
-      const bookingRef = await addDoc(collection(db, 'bookings'), {
-        serialId: newSerialId,
-        customerId: currentUser.uid,
-        vendorId: venue.ownerId || null,
-        venueId: venue.id,
-        venueName: venue.name,
-        venueNameAr: venue.nameAr,
-        venueImage: venue.images[0] || null,
-        date: dateParam,
-        slot: slotParam,
-        totalAmount: totalAmountParam,
-        depositAmount: depositAmountParam,
-        depositPaid: 0,           // No payment yet
-        paymentStatus: 'unpaid',  // Will become 'deposit_paid' after vendor confirms and customer pays
-        status: 'pending_vendor', // Awaiting vendor/admin confirmation
-        createdAt: serverTimestamp(),
-        packageId: packageIdParam || null,
-        packageName: pkg ? pkg.name : null,
-        packageNameAr: pkg ? pkg.nameAr : null,
-        guests: guestsParam,
-      });
-
-      // Save sensitive customer info in a private subcollection
-      await addDoc(collection(db, 'bookings', bookingRef.id, 'private_details'), {
-        type: 'contact',
-        customerName: customerNameParam || userData.name,
-        customerPhone: customerPhoneParam || userData.phone || '',
-        customerEmail: customerEmailParam,
-        notes: notesParam || '',
-        services: servicesParam ? servicesParam.split(',').filter(Boolean) : [],
-        createdAt: serverTimestamp(),
-      });
+      const bookingRef = newBookingRef;
 
       // Format a pretty date for the notifications
       const friendlyDate = formatDate(dateParam);
@@ -171,6 +188,7 @@ export function PaymentScreen() {
       } catch (e) { console.error('Admin notification error in PaymentScreen:', e); }
 
       setIsProcessing(false);
+      toast.success(t('Your request has been submitted. Our team will contact you within 2 hours.', 'تم تقديم طلبك. سيتواصل فريقنا معك خلال ساعتين.'));
       navigate(`/confirmation/${bookingRef.id}`);
     } catch (error: any) {
       console.error('Booking request error:', error);
@@ -216,55 +234,44 @@ export function PaymentScreen() {
 
       <div className="px-6 py-6 space-y-5">
 
-        {/* ── How It Works Banner ───────────────────────────────── */}
-        <Card className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 border rounded-2xl">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-              <Bell className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base">{t('How Booking Works', 'كيف يعمل الحجز')}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {t('No payment is required right now.', 'لا يلزم أي دفع الآن.')}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              {
-                icon: CheckCircle2,
-                step: t('1. Submit your booking request below', '١. أرسل طلب حجزك أدناه'),
-                sub: t('We record your details — no payment taken yet.', 'نسجّل بياناتك — لا يتم أي خصم الآن.'),
-              },
-              {
-                icon: PhoneCall,
-                step: t('2. Metysara coordinates with the venue', '٢. متيسرة تتواصل مع المكان'),
-                sub: t('We contact the vendor to confirm your selected date is available.', 'نتواصل مع المكان للتأكد من توفر التاريخ المختار.'),
-              },
-              {
-                icon: Bell,
-                step: t('3. You receive a notification within 2 hours', '٣. تصلك إشعار في غضون ساعتين'),
-                sub: t('Once confirmed, you\'ll be notified and can proceed to pay the deposit.', 'عند التأكيد ستصلك رسالة ويمكنك إكمال دفع العربون.'),
-              },
-              {
-                icon: CreditCard,
-                step: t('4. Pay the deposit to secure your booking', '٤. ادفع العربون لتأمين حجزك'),
-                sub: t('20% deposit required. Remaining balance paid directly at the venue.', '20% عربون مطلوب. يتم دفع الباقي مباشرة في المكان.'),
-              },
-            ].map(({ icon: Icon, step, sub }, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
-                  <Icon className="h-3.5 w-3.5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{step}</p>
-                  <p className="text-[11px] text-muted-foreground">{sub}</p>
-                </div>
+        {/* ── Payment Options ───────────────────────────────── */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-lg">{t('Select Payment Method', 'اختر طريقة الدفع')}</h3>
+          
+          <Card 
+            className={`p-5 border-2 cursor-pointer transition-all ${paymentMethod === 'bank' ? 'border-primary bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
+            onClick={() => setPaymentMethod('bank')}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${paymentMethod === 'bank' ? 'border-primary' : 'border-muted-foreground'}`}>
+                {paymentMethod === 'bank' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
               </div>
-            ))}
-          </div>
-        </Card>
+              <div>
+                <h4 className="font-bold">{t('Pay Deposit by Bank Transfer', 'دفع العربون بتحويل بنكي')}</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('Bank: [Bank Name] — Account: [Account Number] — Name: Metysara', 'البنك: [اسم البنك] — الحساب: [رقم الحساب] — الاسم: Metysara')}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card 
+            className={`p-5 border-2 cursor-pointer transition-all ${paymentMethod === 'venue' ? 'border-primary bg-primary/5' : 'border-border/50 hover:border-primary/50'}`}
+            onClick={() => setPaymentMethod('venue')}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${paymentMethod === 'venue' ? 'border-primary' : 'border-muted-foreground'}`}>
+                {paymentMethod === 'venue' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+              </div>
+              <div>
+                <h4 className="font-bold">{t('Pay at Venue', 'الدفع في المكان')}</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('Confirm booking with cash payment on arrival.', 'تأكيد الحجز والدفع نقداً عند الوصول.')}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
         {/* ── Booking Summary ─────────────────────────────────── */}
         <Card className="p-6 border-none shadow-sm">
@@ -361,8 +368,8 @@ export function PaymentScreen() {
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
           <p className="text-sm text-amber-900 font-medium leading-relaxed">
             ⚠️ {t(
-              'By submitting this request, you are not charged yet. Payment will only be processed after the venue confirms your booking.',
-              'بإرسال هذا الطلب، لا يتم خصم أي مبلغ الآن. سيتم الدفع فقط بعد تأكيد المكان لحجزك.'
+              'By submitting this request, your booking will be created and sent to the venue for confirmation. Our team will contact you within 2 hours.',
+              'بإرسال هذا الطلب، سيتم إنشاء حجزك وإرساله للمكان للتأكيد. سيتواصل فريقنا معك خلال ساعتين.'
             )}
           </p>
         </div>
@@ -372,7 +379,7 @@ export function PaymentScreen() {
       <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border px-6 py-4 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-50">
         <Button
           onClick={handleSubmitRequest}
-          disabled={isProcessing || isSubmitted}
+          disabled={isProcessing || isSubmitted || !paymentMethod}
           className="w-full h-14 text-lg rounded-xl font-bold shadow-lg shadow-primary/20"
           size="lg"
         >

@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { User, Mail, Lock, Phone, Eye, EyeOff, Globe } from 'lucide-react';
@@ -8,33 +11,35 @@ import { useLanguage } from '../context/LanguageContext';
 import { Checkbox } from '../components/ui/checkbox';
 import { Link } from 'react-router';
 
+const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password needs at least one uppercase letter')
+    .regex(/[0-9]/, 'Password needs at least one number'),
+  phone: z.string().regex(/^01[0125][0-9]{8}$/, 'Invalid Egyptian phone number'),
+});
+type SignupFormData = z.infer<typeof signupSchema>;
+
 export function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSigningUp, setIsSigningUp] = useState(false);
-  const { register, loginWithGoogle, loginWithFacebook, userData } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-  });
+  const { register: registerUser, loginWithGoogle, loginWithFacebook, userData } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
+  const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
+  });
 
-  const handleSignup = async () => {
-    if (!formData.email || !formData.password || !formData.name) {
-      setErrorMsg(t('Please fill in all required fields.', 'يرجى ملء جميع الحقول المطلوبة.'));
-      return;
-    }
-
+  const handleSignup = handleSubmit(async (data: SignupFormData) => {
     if (!agreedToTerms) {
       setErrorMsg(t('You must agree to the Terms of Service & Privacy Policy.', 'يجب الموافقة على شروط الخدمة وسياسة الخصوصية.'));
       return;
     }
 
-    const emailLower = formData.email.toLowerCase();
+    const emailLower = data.email.toLowerCase();
     if (emailLower.endsWith('@metysara.com') || emailLower.endsWith('@metysaravendors.com')) {
       setErrorMsg(t('These email domains are reserved for staff and vendors.', 'هذه النطاقات البريدية مخصصة للموظفين والمزودين فقط.'));
       return;
@@ -43,14 +48,13 @@ export function SignupScreen() {
     setIsSigningUp(true);
     setErrorMsg('');
     try {
-      await register(formData.email, formData.password, formData.name, 'customer');
-      // Success! The AuthContext will pick up the new user and useEffect will route them.
+      await registerUser(data.email, data.password, data.name, 'customer');
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || 'Failed to create account');
       setIsSigningUp(false);
     }
-  };
+  });
 
   useEffect(() => {
     if (userData) {
@@ -59,7 +63,7 @@ export function SignupScreen() {
   }, [userData, navigate]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-background flex flex-col relative overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Background Decorative Elements */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl" />
@@ -104,10 +108,10 @@ export function SignupScreen() {
               <Input
                 type="text"
                 placeholder={t('Enter your full name', 'ادخل اسمك الكامل')}
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                {...register('name')}
                 className={`h-16 ${language === 'ar' ? 'pr-14 pl-6' : 'pl-14 pr-6'} bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/5 transition-all text-base font-medium`}
               />
+              {errors.name && <p className="text-xs text-destructive mt-1 ml-4">{errors.name.message}</p>}
             </div>
           </div>
 
@@ -123,10 +127,10 @@ export function SignupScreen() {
               <Input
                 type="email"
                 placeholder={t('Enter your email', 'ادخل بريدك الإلكتروني')}
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                {...register('email')}
                 className={`h-16 ${language === 'ar' ? 'pr-14 pl-6' : 'pl-14 pr-6'} bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/5 transition-all text-base font-medium`}
               />
+              {errors.email && <p className="text-xs text-destructive mt-1 ml-4">{errors.email.message}</p>}
             </div>
           </div>
 
@@ -142,10 +146,10 @@ export function SignupScreen() {
               <Input
                 type="tel"
                 placeholder="+20 123 456 7890"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                {...register('phone')}
                 className={`h-16 ${language === 'ar' ? 'pr-14 pl-6' : 'pl-14 pr-6'} bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/5 transition-all text-base font-medium`}
               />
+              {errors.phone && <p className="text-xs text-destructive mt-1 ml-4">{errors.phone.message}</p>}
             </div>
           </div>
 
@@ -161,10 +165,10 @@ export function SignupScreen() {
               <Input
                 type={showPassword ? 'text' : 'password'}
                 placeholder={t('Create a password', 'انشئ كلمة مرور')}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                {...register('password')}
                 className={`h-16 ${language === 'ar' ? 'pr-14 pl-14' : 'pl-14 pr-14'} bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/5 transition-all text-base font-medium`}
               />
+              {errors.password && <p className="text-xs text-destructive mt-1 ml-4">{errors.password.message}</p>}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -199,7 +203,7 @@ export function SignupScreen() {
         )}
 
         <Button
-          onClick={handleSignup}
+          onClick={handleSignup as any}
           disabled={isSigningUp}
           className="w-full h-16 text-lg font-black uppercase tracking-widest rounded-3xl mb-8 shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
           size="lg"

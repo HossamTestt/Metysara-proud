@@ -37,11 +37,23 @@ function markOnboardingSeen() {
 
 export function OnboardingScreen() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [direction, setDirection] = useState<'left' | 'right'>('right');
   const navigate = useNavigate();
+
+  const changeSlide = (newIndex: number) => {
+    if (animating || newIndex === currentSlide) return;
+    setDirection(newIndex > currentSlide ? 'right' : 'left');
+    setAnimating(true);
+    setTimeout(() => {
+      setCurrentSlide(newIndex);
+      setAnimating(false);
+    }, 280);
+  };
 
   const handleNext = () => {
     if (currentSlide < onboardingSlides.length - 1) {
-      setCurrentSlide(currentSlide + 1);
+      changeSlide(currentSlide + 1);
     } else {
       // Last slide — mark onboarding complete and go to login
       markOnboardingSeen();
@@ -58,9 +70,13 @@ export function OnboardingScreen() {
   const Icon = slide.icon;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse delay-700" />
+      
       {/* Skip Button */}
-      <div className="p-6 flex justify-end">
+      <div className="p-6 flex justify-end relative z-10">
         <button 
           onClick={handleSkip}
           className="text-muted-foreground hover:text-foreground transition-colors font-medium"
@@ -70,33 +86,40 @@ export function OnboardingScreen() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-        <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center mb-8">
-          <Icon className="w-16 h-16 text-primary" />
+      <div 
+        className={`flex-1 flex flex-col items-center justify-center px-8 text-center transition-all duration-300 relative z-10 ${
+          animating 
+            ? direction === 'left' ? '-translate-x-6 opacity-0' : 'translate-x-6 opacity-0' 
+            : 'translate-x-0 opacity-100'
+        }`}
+      >
+        <div className="w-40 h-40 rounded-[3rem] bg-gradient-to-br from-[#C5A572]/10 to-[#E8E6DA]/30 flex items-center justify-center mb-10 shadow-inner group transition-transform duration-500 hover:scale-105">
+          <Icon className="w-16 h-16 text-primary group-hover:rotate-12 transition-transform duration-500" />
         </div>
 
-        <h1 className="text-3xl mb-4 text-foreground max-w-md font-bold">
+        <h1 className="text-3xl mb-4 text-foreground max-w-md font-bold tracking-tight">
           {slide.titleEn}
         </h1>
         <p className="text-muted-foreground text-lg mb-2 max-w-sm">
           {slide.descriptionEn}
         </p>
-        <p className="text-muted-foreground text-lg max-w-sm" dir="rtl">
+        <p className="text-muted-foreground text-lg max-w-sm font-medium" dir="rtl">
           {slide.descriptionAr}
         </p>
       </div>
 
       {/* Indicators and Button */}
-      <div className="p-8">
+      <div className="p-8 relative z-10">
         {/* Indicators */}
         <div className="flex justify-center gap-2 mb-8">
           {onboardingSlides.map((_, index) => (
-            <div
+            <button
               key={index}
+              onClick={() => changeSlide(index)}
               className={`h-2 rounded-full transition-all ${
                 index === currentSlide
                   ? 'w-8 bg-primary'
-                  : 'w-2 bg-primary/30'
+                  : 'w-2 bg-primary/30 hover:bg-primary/50 cursor-pointer'
               }`}
             />
           ))}

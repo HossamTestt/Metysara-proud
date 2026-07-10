@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import { Button } from './ui/button';
+import { db } from '../../services/firebase';
+import { Button } from './button';
 
 const VENUES_DATA = [
   {

@@ -4,6 +4,7 @@ import { db, storage } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { optimizeImage } from '../utils/imageOptimization';
+import { useComments } from '../hooks/useComments';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -40,6 +41,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { venueSubTypes } from '../constants';
+
 export function VenueDetailScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -60,8 +63,10 @@ export function VenueDetailScreen() {
 
   const venueId = id || '';
   const venue = getVenueById(venueId);
-  const comments = getCommentsByVenueId(venueId);
+  const { comments, loading: commentsLoading } = useComments(venueId);
   const [activeBookings, setActiveBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
   const { currentUser, userData } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -88,6 +93,8 @@ export function VenueDetailScreen() {
 
   useEffect(() => {
     const fetchBookings = async () => {
+      setBookingsLoading(true);
+      setBookingsError(null);
       try {
         const q = query(collection(db, 'bookings'), where('venueId', '==', venueId));
         const snapshot = await getDocs(q);
@@ -95,8 +102,11 @@ export function VenueDetailScreen() {
            ['pending_vendor', 'pending_admin', 'confirmed'].includes(b.status)
         );
         setActiveBookings(active);
-      } catch (e) {
+      } catch (e: any) {
         console.error("Error fetching bookings for calendar", e);
+        setBookingsError(e?.message || 'Failed to load availability');
+      } finally {
+        setBookingsLoading(false);
       }
     };
     if (venueId) fetchBookings();
@@ -104,8 +114,9 @@ export function VenueDetailScreen() {
 
   if (!venue) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">{t('Venue not found', 'المكان غير موجود')}</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-6">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-muted-foreground text-sm">{t('Loading venue...', 'جاري تحميل المكان...')}</p>
       </div>
     );
   }
@@ -138,6 +149,7 @@ export function VenueDetailScreen() {
     try {
       const commentData: any = {
         venueId: venue!.id,
+        userId: currentUser.uid,
         userName: userData?.name || currentUser.email || 'Guest',
         rating: newRating,
         comment: newComment,
@@ -252,9 +264,10 @@ export function VenueDetailScreen() {
       <div className="relative h-[55vh] overflow-hidden group">
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 z-10" />
         <img
+          onClick={() => setIsLightboxOpen(true)}
           src={venue.images[currentImageIndex] || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=1000'}
           alt={venue.name}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 cursor-pointer"
         />
         
         {/* Floating Controls */}
@@ -301,6 +314,13 @@ export function VenueDetailScreen() {
               <div className="px-3 py-1 bg-primary rounded-lg text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-primary/30">
                 {t(venue.type.toUpperCase(), venue.type.toUpperCase())}
               </div>
+              {venue.subType && venueSubTypes[venue.type || 'wedding']?.find(st => st.id === venue.subType) && (
+                <div className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest text-white border border-white/10 shadow-lg">
+                  {language === 'ar' 
+                    ? venueSubTypes[venue.type || 'wedding']?.find(st => st.id === venue.subType)?.nameAr 
+                    : venueSubTypes[venue.type || 'wedding']?.find(st => st.id === venue.subType)?.name}
+                </div>
+              )}
               <div className="flex items-center gap-1 bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
                 <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
                 <span className="text-white text-[10px] font-black">{venue.rating || 5.0}</span>
@@ -320,6 +340,13 @@ export function VenueDetailScreen() {
           </div>
         </div>
         
+        {/* Image Counter Badge */}
+        {venue.images.length > 1 && (
+          <div className={`absolute top-[calc(1.5rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1`}>
+            <span className="text-white text-xs font-bold">{currentImageIndex + 1} / {venue.images.length}</span>
+          </div>
+        )}
+        
         {/* Progress Bar for Images */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 z-20">
           <div 
@@ -328,6 +355,27 @@ export function VenueDetailScreen() {
           />
         </div>
       </div>
+
+      {/* Thumbnail Strip */}
+      {venue.images.length > 1 && (
+        <div className="px-6 -mt-4 relative z-20 mb-2">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-2">
+            {venue.images.map((img: string, i: number) => (
+              <button
+                key={i}
+                onClick={() => { setCurrentImageIndex(i); setIsLightboxOpen(true); }}
+                className={`w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all ${
+                  i === currentImageIndex 
+                    ? 'ring-2 ring-primary border-primary shadow-lg shadow-primary/20 scale-105' 
+                    : 'border-transparent opacity-60 hover:opacity-100'
+                }`}
+              >
+                <img src={img} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="px-6 -mt-8 relative z-10">
@@ -397,7 +445,7 @@ export function VenueDetailScreen() {
             <Card className="p-6 border-none shadow-sm">
               <h3 className="text-lg font-bold mb-4">{t('Amenities', 'المميزات')}</h3>
               <div className="grid grid-cols-2 gap-4">
-                {(venue.amenities || amenities.map(a => a.name)).map((amenityName, index) => {
+                {(venue.amenities || []).map((amenityName, index) => {
                   const defAmenity = amenities.find(a => a.name === amenityName);
                   const Icon = defAmenity?.icon || CheckCircle2;
                   return (
@@ -570,6 +618,7 @@ export function VenueDetailScreen() {
                 placeholder={t('Write your review here...', 'اكتب تقييمك هنا...')}
                 className="min-h-[100px] bg-muted/30 border-none rounded-xl mb-4"
                 disabled={isSubmittingReview}
+                maxLength={500}
               />
 
               {/* Photo Thumbnails */}

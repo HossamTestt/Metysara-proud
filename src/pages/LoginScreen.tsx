@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Mail, Lock, Eye, EyeOff, Globe } from 'lucide-react';
@@ -12,31 +15,51 @@ import { toast } from 'sonner';
 
 const HAS_LOGGED_IN_KEY = 'metysara_has_logged_in';
 
+const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+type LoginFormData = z.infer<typeof loginSchema>;
+
 export function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { login, register, loginWithGoogle, loginWithFacebook, userData } = useAuth();
+  const { login, register: registerUser, loginWithGoogle, loginWithFacebook, userData } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
+  const { register, handleSubmit, getValues, formState: { errors } } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
 
   // Detect first-time vs returning user
   const isReturningUser = (() => {
     try { return localStorage.getItem(HAS_LOGGED_IN_KEY) === 'true'; } catch { return false; }
   })();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setErrorMsg('Please enter your email and password.');
-      return;
-    }
-    
+  const handleLogin = handleSubmit(async (data: LoginFormData) => {
     setIsLoggingIn(true);
     setErrorMsg('');
     try {
-      await login(email, password);
+      await login(data.email, data.password);
+      
+      // Check email verification
+      if (auth.currentUser && !auth.currentUser.emailVerified) {
+        toast.warning(t('Your email is not verified.', 'بريدك الإلكتروني غير موثق.'), {
+          action: {
+            label: t('Resend', 'إعادة إرسال'),
+            onClick: () => {
+              import('firebase/auth').then(({ sendEmailVerification }) => {
+                sendEmailVerification(auth.currentUser!).then(() => {
+                  toast.success(t('Verification email sent.', 'تم إرسال بريد التوثيق.'));
+                });
+              });
+            }
+          },
+          duration: 10000
+        });
+      }
+
       // Mark that user has now logged in at least once
       try { localStorage.setItem(HAS_LOGGED_IN_KEY, 'true'); } catch {/* ignore */}
     } catch (err: any) {
@@ -44,9 +67,10 @@ export function LoginScreen() {
       setErrorMsg(err.message || 'Failed to login');
       setIsLoggingIn(false);
     }
-  };
+  });
 
   const handleForgotPassword = async () => {
+    const email = getValues('email');
     if (!email) {
       setErrorMsg(t('Please enter your email address first.', 'يرجى إدخال البريد الإلكتروني أولاً.'));
       return;
@@ -87,10 +111,10 @@ export function LoginScreen() {
   }, [userData, navigate]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-background flex flex-col relative overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Background Decorative Elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl" />
+      <div className="absolute top-0 right-0 w-80 h-80 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl animate-pulse" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       
       {/* Language Switcher Floating */}
       <div className="absolute top-12 right-6 z-50">
@@ -126,26 +150,27 @@ export function LoginScreen() {
         <div className="space-y-6 mb-8">
           {/* Email Input */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-2 rtl:mr-2 block">
+            <label className={`text-[10px] font-black uppercase tracking-widest text-muted-foreground block ${language === 'ar' ? 'mr-2' : 'ml-2'}`}>
               {t('Email / Phone', 'البريد الإلكتروني / رقم الهاتف')}
             </label>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 rtl:right-0 px-5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-muted-foreground">
+            <div className="relative group" dir="ltr">
+              <div className="absolute inset-y-0 left-0 px-5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-muted-foreground">
                 <Mail className="h-5 w-5" />
               </div>
               <Input
                 type="email"
-                placeholder={t('Enter your email', 'ادخل بريدك الإلكتروني')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`h-16 ${language === 'ar' ? 'pr-14 pl-6' : 'pl-14 pr-6'} bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/5 transition-all text-base font-medium`}
+                dir="ltr"
+                placeholder={language === 'ar' ? 'ادخل بريدك الإلكتروني' : 'Enter your email'}
+                {...register('email')}
+                className="h-16 pl-14 pr-6 bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:border-primary/40 transition-all text-base font-medium text-left"
               />
+              {errors.email && <p className="text-xs text-destructive mt-1 ml-4">{errors.email.message}</p>}
             </div>
           </div>
 
           {/* Password Input */}
           <div className="space-y-2">
-            <div className="flex justify-between items-center ml-2 rtl:mr-2">
+            <div className={`flex justify-between items-center ${language === 'ar' ? 'mr-2' : 'ml-2'}`}>
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
                 {t('Password', 'كلمة المرور')}
               </label>
@@ -156,21 +181,22 @@ export function LoginScreen() {
                 {t('Forgot?', 'نسيت؟')}
               </button>
             </div>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 rtl:right-0 px-5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-muted-foreground">
+            <div className="relative group" dir="ltr">
+              <div className="absolute inset-y-0 left-0 px-5 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-muted-foreground">
                 <Lock className="h-5 w-5" />
               </div>
               <Input
                 type={showPassword ? 'text' : 'password'}
-                placeholder={t('Enter your password', 'ادخل كلمة المرور')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`h-16 ${language === 'ar' ? 'pr-14 pl-14' : 'pl-14 pr-14'} bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/5 transition-all text-base font-medium`}
+                dir="ltr"
+                placeholder={language === 'ar' ? 'ادخل كلمة المرور' : 'Enter your password'}
+                {...register('password')}
+                className="h-16 pl-14 pr-14 bg-white/50 backdrop-blur-md border-primary/5 rounded-3xl shadow-inner focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:border-primary/40 transition-all text-base font-medium text-left"
               />
+              {errors.password && <p className="text-xs text-destructive mt-1 ml-4">{errors.password.message}</p>}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className={`absolute inset-y-0 right-0 rtl:left-0 px-5 flex items-center text-muted-foreground hover:text-primary transition-colors`}
+                className="absolute inset-y-0 right-0 px-5 flex items-center text-muted-foreground hover:text-primary transition-colors"
               >
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
@@ -185,9 +211,9 @@ export function LoginScreen() {
         )}
 
         <Button
-          onClick={handleLogin}
+          onClick={handleLogin as any}
           disabled={isLoggingIn}
-          className="w-full h-16 text-lg font-black uppercase tracking-widest rounded-3xl mb-8 shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+          className="w-full h-16 text-lg font-black uppercase tracking-widest rounded-3xl mb-8 shadow-2xl shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all"
           size="lg"
         >
           {isLoggingIn ? t("Signing in...", "جاري الدخول...") : t("Sign In", "دخول")}

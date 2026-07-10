@@ -28,6 +28,26 @@ const AVAILABLE_AMENITIES = [
   { icon: Shield, name: '24/7 Security' },
 ];
 
+const venueSubTypes: Record<string, { id: string, name: string, nameAr: string }[]> = {
+  venue: [
+    { id: 'open_villa', name: 'Open Villa', nameAr: 'فيلا مكشوفة' },
+    { id: 'open_hall', name: 'Open Hall', nameAr: 'قاعة مكشوفة' },
+    { id: 'covered_hall', name: 'Covered Hall', nameAr: 'قاعة مغطاة' },
+    { id: 'hotel', name: 'Hotel', nameAr: 'فندق' }
+  ],
+  wedding: [
+    { id: 'open_villa', name: 'Open Villa', nameAr: 'فيلا مكشوفة' },
+    { id: 'open_hall', name: 'Open Hall', nameAr: 'قاعة مكشوفة' },
+    { id: 'covered_hall', name: 'Covered Hall', nameAr: 'قاعة مغطاة' },
+    { id: 'hotel', name: 'Hotel', nameAr: 'فندق' }
+  ],
+  funeral: [
+    { id: 'mosque_hall', name: 'Mosque Hall', nameAr: 'دار في مسجد' },
+    { id: 'hotel', name: 'Hotel', nameAr: 'فندق' },
+    { id: 'other', name: 'Other', nameAr: 'أخرى' }
+  ]
+};
+
 export function VendorDashboardScreen() {
   const { currentUser, userData, logout } = useAuth();
   const { language, t } = useLanguage();
@@ -45,6 +65,7 @@ export function VendorDashboardScreen() {
   const [editPolicies, setEditPolicies] = useState('');
   const [editPoliciesAr, setEditPoliciesAr] = useState('');
   const [editCategory, setEditCategory] = useState('venue');
+  const [editSubType, setEditSubType] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editLocationLink, setEditLocationLink] = useState('');
   const [editMorningLabel, setEditMorningLabel] = useState('12:00 PM - 06:00 PM');
@@ -94,6 +115,7 @@ export function VendorDashboardScreen() {
           setEditPolicies(target.policies || '');
           setEditPoliciesAr(target.policiesAr || '');
           setEditCategory(target.type || 'venue');
+          setEditSubType(target.subType || '');
           setEditLocation(target.location || target.zone || '');
           setEditLocationLink(target.locationLink || '');
           setEditMorningLabel(target.timeSlots?.morningLabel || '12:00 PM - 06:00 PM');
@@ -169,6 +191,7 @@ export function VendorDashboardScreen() {
         policies: editPolicies,
         policiesAr: editPoliciesAr,
         type: editCategory,
+        subType: editSubType,
         location: editLocation,
         locationLink: editLocationLink,
         timeSlots: { morningLabel: editMorningLabel, eveningLabel: editEveningLabel },
@@ -700,10 +723,30 @@ export function VendorDashboardScreen() {
                         <SelectItem value="limousine">Limousine (ليموزين)</SelectItem>
                         <SelectItem value="catering">Catering (تقديم طعام)</SelectItem>
                         <SelectItem value="event_hall">Event Hall (قاعة فعاليات)</SelectItem>
+                        <SelectItem value="planner">Wedding Planner (منظم أفراح)</SelectItem>
+                        <SelectItem value="decor">Decor (ديكور)</SelectItem>
+                        <SelectItem value="hair_styling">Hair Styling (تصفيف شعر)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+                
+                {venueSubTypes[editCategory] && (
+                  <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground">Venue Type</label>
+                    <Select value={editSubType} onValueChange={setEditSubType}>
+                      <SelectTrigger className="bg-muted/30 border-none rounded-xl mt-1 h-10 w-full">
+                        <SelectValue placeholder="Select Venue Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select Venue Type (بدون)</SelectItem>
+                        {venueSubTypes[editCategory].map(st => (
+                          <SelectItem key={st.id} value={st.id}>{st.name} / {st.nameAr}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Amenities Selection */}
                 <div className="border-t pt-4">

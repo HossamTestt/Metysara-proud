@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { db } from '../services/firebase';
-import { collection, onSnapshot, doc, updateDoc, addDoc, getDoc, arrayUnion, arrayRemove, getDocs, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, arrayUnion, arrayRemove, getDocs, query, limit, startAfter, DocumentSnapshot, orderBy } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface VenuePackage {
@@ -30,6 +30,7 @@ export interface Venue {
   capacity: number;
   images: string[];
   type: string; // wedding, funeral, catering, photographer, videographer, makeup, planner, event_hall
+  subType?: string;
   city?: string;
   timeSlots?: { morningLabel?: string; eveningLabel?: string };
   availability?: Record<string, { morning?: boolean, evening?: boolean, fullDay?: boolean, fullyBooked?: boolean }>;
@@ -53,7 +54,9 @@ interface Comment {
 interface VenuesContextType {
   venues: Venue[];
   comments: Comment[];
-  savedVenues: string[]; // Array of venue IDs
+  savedVenues: string[];
+  hasMore: boolean;
+  loadMoreVenues: () => Promise<void>;
   updateVenue: (id: string, updates: Partial<Venue>) => Promise<void>;
   addComment: (comment: Omit<Comment, 'id' | 'date'>) => Promise<void>;
   toggleFavorite: (venueId: string) => Promise<void>;
@@ -67,28 +70,25 @@ export function VenuesProvider({ children }: { children: ReactNode }) {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [savedVenues, setSavedVenues] = useState<string[]>([]);
+  const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   const { currentUser } = useAuth();
 
   useEffect(() => {
-    const unsubscribeVenues = onSnapshot(collection(db, 'venues'), (snapshot) => {
+    const venuesQuery = query(collection(db, 'venues'), orderBy('rating', 'desc'), limit(20));
+    const unsubscribeVenues = onSnapshot(venuesQuery, (snapshot) => {
       const venuesData: Venue[] = [];
       snapshot.forEach((doc) => {
         venuesData.push({ id: doc.id, ...doc.data() } as Venue);
       });
       setVenues(venuesData);
-    });
-
-    const unsubscribeComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
-      const commentsData: Comment[] = [];
-      snapshot.forEach((doc) => {
-        commentsData.push({ id: doc.id, ...doc.data() } as Comment);
-      });
-      setComments(commentsData);
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+      setLastVisible(lastDoc || null);
+      setHasMore(snapshot.docs.length === 20);
     });
 
     return () => {
       unsubscribeVenues();
-      unsubscribeComments();
     };
   }, []);
 
@@ -116,6 +116,25 @@ export function VenuesProvider({ children }: { children: ReactNode }) {
       console.error("Error updating venue:", e);
     }
   };
+
+  const loadMoreVenues = useCallback(async () => {
+    if (!lastVisible || !hasMore) return;
+    try {
+      const q = query(
+        collection(db, 'venues'),
+        orderBy('rating', 'desc'),
+        startAfter(lastVisible),
+        limit(20)
+      );
+      const snapshot = await getDocs(q);
+      const newVenues = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as Venue);
+      setVenues(prev => [...prev, ...newVenues]);
+      setLastVisible(snapshot.docs[snapshot.docs.length - 1] || null);
+      setHasMore(snapshot.docs.length === 20);
+    } catch (e) {
+      console.error('Error loading more venues:', e);
+    }
+  }, [lastVisible, hasMore]);
 
   const addComment = async (comment: Omit<Comment, 'id' | 'date'>) => {
     try {
@@ -169,6 +188,8 @@ export function VenuesProvider({ children }: { children: ReactNode }) {
       venues,
       comments,
       savedVenues,
+      hasMore,
+      loadMoreVenues,
       updateVenue,
       addComment,
       toggleFavorite,

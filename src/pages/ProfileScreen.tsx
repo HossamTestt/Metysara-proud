@@ -65,8 +65,10 @@ export function ProfileScreen() {
   const searchParams = new URLSearchParams(location.search);
   const initialTab = searchParams.get('tab') || 'bookings';
 
+  const { currentUser, userData, logout } = useAuth();
+  
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(userData?.notificationsEnabled ?? true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   
   const [tickets, setTickets] = useState<any[]>([]);
@@ -74,8 +76,6 @@ export function ProfileScreen() {
   const [newTicketSubject, setNewTicketSubject] = useState('');
   const [newTicketMessage, setNewTicketMessage] = useState('');
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
-  
-  const { currentUser, userData, logout } = useAuth();
   
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState(userData?.name || '');
@@ -130,9 +130,29 @@ export function ProfileScreen() {
     }
   }, [userData]);
 
+  useEffect(() => {
+    if (userData && userData.notificationsEnabled !== undefined) {
+      setNotificationsEnabled(userData.notificationsEnabled);
+    }
+  }, [userData]);
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     navigate(`/profile?tab=${value}`, { replace: true });
+  };
+
+  const handleToggleNotifications = async (checked: boolean) => {
+    setNotificationsEnabled(checked);
+    if (userData?.uid) {
+      try {
+        await updateDoc(doc(db, 'users', userData.uid), {
+          notificationsEnabled: checked
+        });
+      } catch (err) {
+        console.error("Failed to update notifications", err);
+        setNotificationsEnabled(!checked);
+      }
+    }
   };
 
   const handleSubmitTicket = async () => {
@@ -503,7 +523,8 @@ export function ProfileScreen() {
             {bookings.length > 0 ? bookings.map((booking) => (
               <Card
                 key={booking.id}
-                className="overflow-hidden cursor-pointer hover:shadow-xl transition-all active:scale-[0.98] border-none shadow-md rounded-[2rem] group"
+                className="overflow-hidden cursor-pointer hover:shadow-xl transition-all active:scale-[0.98] border-none shadow-md rounded-[2rem] group animate-fade-up"
+                style={{ animationDelay: `${bookings.indexOf(booking) * 0.05}s` }}
                 onClick={() => navigate(`/confirmation/${booking.id}`)}
               >
                 <div className="flex gap-0">
@@ -556,7 +577,8 @@ export function ProfileScreen() {
                 {savedVenues.map((venue) => (
                   <Card
                     key={venue.id}
-                    className="overflow-hidden cursor-pointer hover:shadow-xl transition-all active:scale-[0.98] border-none shadow-md rounded-[2rem] group"
+                    className="overflow-hidden cursor-pointer hover:shadow-xl transition-all active:scale-[0.98] border-none shadow-md rounded-[2rem] group animate-fade-up"
+                    style={{ animationDelay: `${savedVenues.indexOf(venue) * 0.05}s` }}
                     onClick={() => navigate(`/venue/${venue.id}`)}
                   >
                     <div className="flex gap-0">
@@ -649,7 +671,7 @@ export function ProfileScreen() {
                           <p className="text-[10px] text-muted-foreground font-medium">{notificationsEnabled ? t('Enabled', 'مفعلة') : t('Disabled', 'معطلة')}</p>
                         </div>
                       </div>
-                      <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} className="data-[state=checked]:bg-primary" />
+                      <Switch checked={notificationsEnabled} onCheckedChange={handleToggleNotifications} className="data-[state=checked]:bg-primary" />
                     </div>
 
                     <button 
@@ -863,26 +885,6 @@ export function ProfileScreen() {
         </Tabs>
       </div>
 
-      {/* Unified Bottom Navigation - More premium look */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-xl border-t border-primary/5 px-8 py-5 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50">
-        <div className="flex items-center justify-between max-w-md mx-auto">
-          {[
-            { id: 'home', icon: Home, label: t('Home', 'الرئيسية'), path: '/home' },
-            { id: 'search', icon: Search, label: t('Explore', 'استكشف'), path: '/search' },
-            { id: 'saved', icon: Heart, label: t('Saved', 'المحفوظات'), action: () => handleTabChange('saved'), active: activeTab === 'saved' },
-            { id: 'bookings', icon: Calendar, label: t('Bookings', 'الحجوزات'), action: () => handleTabChange('bookings'), active: activeTab === 'bookings' }
-          ].map((item) => (
-            <button 
-              key={item.id}
-              className={`flex flex-col items-center gap-1.5 transition-all active:scale-90 ${item.active || (item.id === 'home' && location.pathname === '/home') || (item.id === 'search' && location.pathname === '/search') ? 'text-primary' : 'text-muted-foreground opacity-50'}`} 
-              onClick={item.path ? () => navigate(item.path!) : item.action}
-            >
-              <item.icon className={`h-6 w-6 ${item.active || (item.id === 'home' && location.pathname === '/home') || (item.id === 'search' && location.pathname === '/search') ? 'fill-primary/10' : ''}`} />
-              <span className="text-[10px] font-black uppercase tracking-tighter">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       {isEditProfileOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">

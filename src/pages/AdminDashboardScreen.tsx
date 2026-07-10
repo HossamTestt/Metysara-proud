@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Calendar } from '../components/ui/calendar';
 import { useVenues } from '../context/VenuesContext';
 import { useAuth } from '../context/AuthContext';
@@ -58,7 +59,71 @@ import {
   ChevronRight,
   RefreshCcw
 } from 'lucide-react';
-import { SeedArabicLoader } from '../components/SeedArabicLoader';
+import { SeedArabicLoader } from '../components/ui/SeedArabicLoader';
+
+const venueSubTypes: Record<string, { id: string, name: string, nameAr: string }[]> = {
+  venue: [
+    { id: 'open_villa', name: 'Open Villa', nameAr: 'فيلا مكشوفة' },
+    { id: 'open_hall', name: 'Open Hall', nameAr: 'قاعة مكشوفة' },
+    { id: 'covered_hall', name: 'Covered Hall', nameAr: 'قاعة مغطاة' },
+    { id: 'hotel', name: 'Hotel', nameAr: 'فندق' }
+  ],
+  wedding: [
+    { id: 'open_villa', name: 'Open Villa', nameAr: 'فيلا مكشوفة' },
+    { id: 'open_hall', name: 'Open Hall', nameAr: 'قاعة مكشوفة' },
+    { id: 'covered_hall', name: 'Covered Hall', nameAr: 'قاعة مغطاة' },
+    { id: 'hotel', name: 'Hotel', nameAr: 'فندق' }
+  ],
+  funeral: [
+    { id: 'mosque_hall', name: 'Mosque Hall', nameAr: 'دار في مسجد' },
+    { id: 'hotel', name: 'Hotel', nameAr: 'فندق' },
+    { id: 'other', name: 'Other', nameAr: 'أخرى' }
+  ]
+};
+
+const ChatCard = ({ chat, navigate }: { chat: any, navigate: any }) => (
+  <Card 
+    className="p-5 border-none shadow-sm cursor-pointer hover:shadow-md hover:bg-muted/50 transition-all active:scale-[0.98] rounded-3xl group relative overflow-hidden"
+    onClick={() => navigate(`/chat?admin=${chat.id}`)}
+  >
+    {chat.unreadAdmin > 0 && (
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary shadow-[0_0_10px_rgba(201,169,110,0.5)]" />
+    )}
+    <div className="flex justify-between items-start mb-2">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-lg shadow-inner">
+          {chat.userName?.charAt(0)?.toUpperCase() || 'U'}
+        </div>
+        <div>
+          <h5 className="font-bold text-sm flex items-center gap-2 group-hover:text-primary transition-colors">
+            {chat.userName || 'Customer'}
+            {chat.unreadAdmin > 0 && (
+              <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse shadow-lg shadow-red-200">
+                {chat.unreadAdmin} NEW
+              </span>
+            )}
+          </h5>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+            Last interaction: {chat.updatedAt?.toDate ? chat.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1">
+         <span className={`text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-widest ${chat.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+           {chat.status}
+         </span>
+         <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+      </div>
+    </div>
+    {chat.lastMessage && (
+      <div className="mt-3 pl-16">
+        <p className="text-xs text-muted-foreground line-clamp-1 italic italic">
+          "{chat.lastMessage}"
+        </p>
+      </div>
+    )}
+  </Card>
+);
 
 export function AdminDashboardScreen() {
   const navigate = useNavigate();
@@ -381,6 +446,7 @@ export function AdminDashboardScreen() {
         zone: '',
         images: [],
         type: newVendor.category,
+        subType: '',
         rating: 0,
         reviews: 0,
         packages: [],
@@ -441,6 +507,7 @@ export function AdminDashboardScreen() {
         description: venue.pendingEdits.description ?? venue.description,
         descriptionAr: venue.pendingEdits.descriptionAr ?? venue.descriptionAr,
         type: venue.pendingEdits.type ?? venue.type,
+        subType: venue.pendingEdits.subType ?? venue.subType ?? '',
         images: venue.pendingEdits.images ?? venue.images,
         amenities: venue.pendingEdits.amenities ?? venue.amenities,
         packages: venue.pendingEdits.packages ?? venue.packages,
@@ -975,58 +1042,58 @@ export function AdminDashboardScreen() {
                </Button>
              </div>
              
-             {liveChats.length === 0 ? (
+             {liveChats.filter(c => isSupport ? (!c.supportId || c.supportId === currentUser?.uid) : true).length === 0 ? (
                <div className="text-center py-24 bg-muted/20 rounded-[2.5rem] border-2 border-dashed border-muted">
                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
                  <p className="text-sm text-muted-foreground font-medium">No active chats at the moment.</p>
                  <p className="text-[10px] text-muted-foreground mt-1">New chats will appear here automatically.</p>
                </div>
              ) : (
-               <div className="grid gap-3">
-                 {liveChats.filter(chat => isSupport ? chat.supportId === currentUser?.uid : true).map((chat) => (
-                   <Card 
-                     key={chat.id} 
-                     className="p-5 border-none shadow-sm cursor-pointer hover:shadow-md hover:bg-muted/50 transition-all active:scale-[0.98] rounded-3xl group relative overflow-hidden"
-                     onClick={() => navigate(`/chat?admin=${chat.id}`)}
-                   >
-                     {chat.unreadAdmin > 0 && (
-                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary shadow-[0_0_10px_rgba(201,169,110,0.5)]" />
-                     )}
-                     <div className="flex justify-between items-start mb-2">
-                       <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-lg shadow-inner">
-                           {chat.userName?.charAt(0)?.toUpperCase() || 'U'}
-                         </div>
-                         <div>
-                           <h5 className="font-bold text-sm flex items-center gap-2 group-hover:text-primary transition-colors">
-                             {chat.userName || 'Customer'}
-                             {chat.unreadAdmin > 0 && (
-                               <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse shadow-lg shadow-red-200">
-                                 {chat.unreadAdmin} NEW
-                               </span>
-                             )}
-                           </h5>
-                           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
-                             Last interaction: {chat.updatedAt?.toDate ? chat.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                           </p>
-                         </div>
-                       </div>
-                       <div className="flex flex-col items-end gap-1">
-                          <span className={`text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-widest ${chat.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                            {chat.status}
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                       </div>
+               <div className="space-y-6">
+                 {/* Unassigned Chats / Queue */}
+                 {liveChats.filter(c => !c.supportId).length > 0 && (
+                   <div>
+                     <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                       Unassigned Queue ({liveChats.filter(c => !c.supportId).length})
+                     </h3>
+                     <div className="grid gap-3">
+                       {liveChats.filter(c => !c.supportId).map(chat => (
+                         <ChatCard key={chat.id} chat={chat} navigate={navigate} />
+                       ))}
                      </div>
-                     {chat.lastMessage && (
-                       <div className="mt-3 pl-16">
-                         <p className="text-xs text-muted-foreground line-clamp-1 italic italic">
-                           "{chat.lastMessage}"
-                         </p>
-                       </div>
-                     )}
-                   </Card>
-                 ))}
+                   </div>
+                 )}
+
+                 {/* My Active Chats */}
+                 {liveChats.filter(c => c.supportId === currentUser?.uid).length > 0 && (
+                   <div>
+                     <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                       My Active Chats ({liveChats.filter(c => c.supportId === currentUser?.uid).length})
+                     </h3>
+                     <div className="grid gap-3">
+                       {liveChats.filter(c => c.supportId === currentUser?.uid).map(chat => (
+                         <ChatCard key={chat.id} chat={chat} navigate={navigate} />
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Other Agents' Chats (Visible to Admins or if we want transparency) */}
+                 {!isSupport && liveChats.filter(c => c.supportId && c.supportId !== currentUser?.uid).length > 0 && (
+                   <div>
+                     <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                       Other Agents' Chats ({liveChats.filter(c => c.supportId && c.supportId !== currentUser?.uid).length})
+                     </h3>
+                     <div className="grid gap-3 opacity-75">
+                       {liveChats.filter(c => c.supportId && c.supportId !== currentUser?.uid).map(chat => (
+                         <ChatCard key={chat.id} chat={chat} navigate={navigate} />
+                       ))}
+                     </div>
+                   </div>
+                 )}
                </div>
              )}
           </TabsContent>
@@ -1241,22 +1308,27 @@ export function AdminDashboardScreen() {
             <Input placeholder="Google Maps Link (Geo Location)" value={newVendor.locationLink || ''} onChange={e => setNewVendor({...newVendor, locationLink: e.target.value})} />
             <div className="space-y-1">
               <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Service Category</label>
-              <Input 
-                list="service-categories"
-                placeholder="Select or type custom category" 
-                value={newVendor.category} 
-                onChange={e => setNewVendor({...newVendor, category: e.target.value})} 
-              />
-              <datalist id="service-categories">
-                <option value="venue" />
-                <option value="event_hall" />
-                <option value="funeral" />
-                <option value="catering" />
-                <option value="photographer" />
-                <option value="videographer" />
-                <option value="makeup" />
-                <option value="planner" />
-              </datalist>
+              <Select
+                value={newVendor.category}
+                onValueChange={(val) => setNewVendor({ ...newVendor, category: val })}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-primary/10">
+                  <SelectValue placeholder="Select service category" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="wedding">💒 Wedding Venue — قاعة أفراح</SelectItem>
+                  <SelectItem value="funeral">🕌 Dar Monasbat — دار مناسبات</SelectItem>
+                  <SelectItem value="event_hall">🏛️ Event Hall — قاعة فعاليات</SelectItem>
+                  <SelectItem value="catering">🍽️ Catering — تقديم طعام</SelectItem>
+                  <SelectItem value="photographer">📷 Photographer — مصور فوتوغرافي</SelectItem>
+                  <SelectItem value="videographer">🎥 Videographer — مصور فيديو</SelectItem>
+                  <SelectItem value="makeup">💄 Makeup Artist — فنان مكياج</SelectItem>
+                  <SelectItem value="planner">📋 Wedding Planner — منظم أفراح</SelectItem>
+                  <SelectItem value="decor">🌸 Decor — ديكور</SelectItem>
+                  <SelectItem value="hair_styling">💇 Hair Styling — تصفيف شعر</SelectItem>
+                  <SelectItem value="photosession">📸 Photo Session Place — أماكن جلسات تصوير</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={handleAddVendor} className="w-full h-12 rounded-xl bg-primary">Create Vendor Account</Button>
           </div>
@@ -1275,6 +1347,18 @@ export function AdminDashboardScreen() {
               <div className="grid grid-cols-2 gap-2">
                 <Input type="number" placeholder="Price" value={editingVenue.price} onChange={e => setEditingVenue({...editingVenue, price: Number(e.target.value)})} />
                 <Input type="number" placeholder="Capacity" value={editingVenue.capacity} onChange={e => setEditingVenue({...editingVenue, capacity: Number(e.target.value)})} />
+                <div className="col-span-2">
+                  <select 
+                    className="w-full h-10 px-3 rounded-md border border-input bg-transparent text-sm"
+                    value={editingVenue.subType || ''}
+                    onChange={e => setEditingVenue({...editingVenue, subType: e.target.value})}
+                  >
+                    <option value="">Select Sub-Type</option>
+                    {(venueSubTypes[editingVenue.type || 'wedding'] || []).map(st => (
+                      <option key={st.id} value={st.id}>{st.name} / {st.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <Button onClick={handleSaveVenue} className="w-full h-12 rounded-xl bg-primary">Save Live Changes</Button>
             </div>

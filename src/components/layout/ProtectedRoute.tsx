@@ -21,8 +21,19 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   const { currentUser, userData, loading } = useAuth();
 
   if (loading) {
-    // Auth is still resolving — render nothing to avoid flashing the page
-    return null;
+    // Return a skeleton loader matching the app's design
+    return (
+      <div className="min-h-screen bg-background flex flex-col p-6 animate-pulse">
+        <div className="w-full h-48 bg-muted rounded-[2.5rem] mb-6 mt-12" />
+        <div className="flex gap-4 mb-6">
+          <div className="flex-1 h-32 bg-muted rounded-2xl" />
+          <div className="flex-1 h-32 bg-muted rounded-2xl" />
+        </div>
+        <div className="w-3/4 h-8 bg-muted rounded-xl mb-4" />
+        <div className="w-full h-32 bg-muted rounded-2xl mb-4" />
+        <div className="w-full h-32 bg-muted rounded-2xl mb-4" />
+      </div>
+    );
   }
 
   if (!currentUser) {

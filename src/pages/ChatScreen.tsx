@@ -49,12 +49,14 @@ export function ChatScreen() {
           const supportSnap = await getDocs(supportQ);
           
           let assignedSupportId = 'admin'; // fallback
+          let assignedSupportName = 'Support';
           if (!supportSnap.empty) {
             // Sort by lastAssigned (oldest first)
             const agents = supportSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-              .sort((a: any, b: any) => (a.lastAssigned?.toMillis?.() || 0) - (b.lastAssigned?.toMillis?.() || 0));
+              .sort((a: any, b: any) => (a.lastAssigned?.toMillis?.() || 0) - (b.lastAssigned?.toMillis?.() || 0)) as any[];
             
             assignedSupportId = agents[0].id;
+            assignedSupportName = agents[0].name || agents[0].email || 'Support Agent';
             
             // Update the agent's lastAssigned timestamp
             await updateDoc(doc(db, 'users', assignedSupportId), {
@@ -69,18 +71,32 @@ export function ChatScreen() {
             );
           }
 
+          const systemMessageText = t(
+            `Chat has been transferred to customer service: ${assignedSupportName}`,
+            `تم تحويل المحادثة مع خدمة العملاء: ${assignedSupportName}`
+          );
+
           const newChatData = {
             userId: currentUser.uid,
             userName: userData.name || 'User',
+            userPhone: userData.phone || 'N/A',
+            userEmail: userData.email || 'N/A',
             supportId: assignedSupportId,
             status: 'active',
-            lastMessage: '',
+            lastMessage: systemMessageText,
             updatedAt: serverTimestamp(),
-            unreadAdmin: 0,
-            unreadUser: 0
+            unreadAdmin: 1,
+            unreadUser: 1
           };
           await setDoc(cRef, newChatData);
           setChatData(newChatData);
+
+          // Add the initial system message
+          await addDoc(collection(db, 'chats', chatId, 'messages'), {
+            senderId: 'system',
+            text: systemMessageText,
+            timestamp: serverTimestamp(),
+          });
         } else {
           setChatData(cSnap.data());
           // Clear unread messages depending on role
@@ -188,7 +204,14 @@ export function ChatScreen() {
               {adminChatId ? `${chatData?.userName || 'Customer'}` : t('Live Support', 'الدعم المباشر')}
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             </h2>
-            <p className="text-xs text-muted-foreground">{adminChatId ? 'Chatting with customer' : t('We typically reply in a few minutes', 'نرد عادة خلال دقائق معدودة')}</p>
+            {adminChatId ? (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {chatData?.userPhone && <p className="text-xs text-muted-foreground font-medium">📞 {chatData.userPhone}</p>}
+                {chatData?.userEmail && <p className="text-xs text-muted-foreground">✉️ {chatData.userEmail}</p>}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">{t('We typically reply in a few minutes', 'نرد عادة خلال دقائق معدودة')}</p>
+            )}
           </div>
         </div>
       </div>
@@ -201,11 +224,21 @@ export function ChatScreen() {
           </div>
         ) : (
           messages.map((msg) => {
+            if (msg.senderId === 'system') {
+              return (
+                <div key={msg.id} className="flex justify-center my-4">
+                  <div className="bg-muted/50 border border-border/50 px-4 py-1.5 rounded-full">
+                    <p className="text-xs font-bold text-muted-foreground text-center">{msg.text}</p>
+                  </div>
+                </div>
+              );
+            }
+
             const isUser = msg.senderId === currentUser?.uid;
             return (
               <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${isUser ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
-                  <p className="text-sm">{msg.text}</p>
+                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                   <p className={`text-[9px] mt-1 text-right ${isUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                     {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </p>

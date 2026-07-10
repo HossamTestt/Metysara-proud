@@ -44,67 +44,7 @@ import {
   Settings
 } from 'lucide-react';
 
-const categories = [
-  {
-    id: 'wedding',
-    nameEn: 'Wedding Venues',
-    nameAr: 'قاعات الأفراح',
-    image: 'https://images.unsplash.com/photo-1631225893179-4d6e349189c2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3ZWRkaW5nJTIwY291cGxlJTIwY2VyZW1vbnl8ZW58MXx8fHwxNzcxODA1OTg0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-  },
-  {
-    id: 'funeral',
-    nameEn: 'Dar Monasbat',
-    nameAr: 'دار مناسبات',
-    image: 'images/dar_monasbat.jpg'
-  },
-  {
-    id: 'other',
-    nameEn: 'Other Options',
-    nameAr: 'خيارات أخرى',
-    subOptions: [
-      { id: 'photographer', nameEn: 'Photographer', nameAr: 'مصور فوتوغرافي', icon: Camera },
-      { id: 'videographer', nameEn: 'Videographer', nameAr: 'مصور فيديو', icon: Video },
-      { id: 'photosession', nameEn: 'Photo Session Places', nameAr: 'أماكن جلسات التصوير', icon: ImageIcon },
-      { id: 'makeup', nameEn: 'Makeup Artist', nameAr: 'فنان مكياج', icon: Sparkles },
-      { id: 'limousine', nameEn: 'Limousine (soon)', nameAr: 'ليموزين (قريباً)', icon: Car },
-      { id: 'catering', nameEn: 'Catering', nameAr: 'تقديم الطعام', icon: UtensilsCrossed },
-      { id: 'event_hall', nameEn: 'Event Hall', nameAr: 'قاعة فعاليات', icon: Home },
-    ]
-  },
-];
-
-const egyptianCities = [
-  { 
-    name: 'Cairo', 
-    nameAr: 'القاهرة',
-    zones: ['Nasr City', 'New Cairo', 'Heliopolis', 'Maadi', 'Downtown', 'Zamalek']
-  },
-  { 
-    name: 'Giza', 
-    nameAr: 'الجيزة',
-    zones: ['Haram', 'October', 'Omranaia', 'Dokki', 'Mohandessin', 'Sheikh Zayed']
-  },
-  { 
-    name: 'Alexandria', 
-    nameAr: 'الإسكندرية',
-    zones: ['Stanley', 'Smouha', 'Sidi Gaber', 'Miami', 'Glim', 'Montazah']
-  },
-  { 
-    name: 'Beni Suef', 
-    nameAr: 'بني سويف',
-    zones: ['Downtown', 'Al Wadi', 'East District']
-  },
-  { 
-    name: 'Fayoum', 
-    nameAr: 'الفيوم',
-    zones: ['City Center', 'Ibshaway', 'Sinnuris']
-  },
-  { 
-    name: 'Minya', 
-    nameAr: 'المنيا',
-    zones: ['Downtown', 'West Minya', 'East Minya']
-  },
-];
+import { categories, egyptianCities } from '../constants';
 
 export function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,13 +53,15 @@ export function HomeScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
-  const { venues, savedVenues, toggleFavorite } = useVenues();
+  const { venues, savedVenues, toggleFavorite, hasMore, loadMoreVenues } = useVenues();
   const { userData } = useAuth();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Filter states
   const [selectedCity, setSelectedCity] = useState('All Cities');
   const [selectedZone, setSelectedZone] = useState('All Zones');
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState('all');
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [minCapacity, setMinCapacity] = useState(0);
 
@@ -130,6 +72,7 @@ export function HomeScreen() {
     const params = new URLSearchParams();
     if (selectedCity !== 'All Cities') params.set('city', selectedCity);
     if (selectedZone !== 'All Zones') params.set('zone', selectedZone);
+    if (selectedFilterCategory !== 'all') params.set('category', selectedFilterCategory);
     if (priceRange[0] > 0) params.set('minPrice', priceRange[0].toString());
     if (priceRange[1] < 500000) params.set('maxPrice', priceRange[1].toString());
     if (minCapacity > 0) params.set('minCapacity', minCapacity.toString());
@@ -147,7 +90,7 @@ export function HomeScreen() {
   };
 
   const topRatedVenues = [...venues].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 10);
-  const promotedVenues = [...venues].sort((a, b) => (b.price || 0) - (a.price || 0)).slice(0, 5);
+  const promotedVenues = venues.filter(v => (v as any).isPromoted).slice(0, 5);
 
   return (
     <div className="min-h-screen bg-background pb-28" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -278,6 +221,29 @@ export function HomeScreen() {
                 </Select>
               </div>
             )}
+            {/* Category */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">{t('Category', 'القسم')}</label>
+              <Select value={selectedFilterCategory} onValueChange={setSelectedFilterCategory}>
+                <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-primary/5">
+                  <SelectValue placeholder={t('Select Category', 'اختر القسم')} />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="all">{t('All Categories', 'جميع الأقسام')}</SelectItem>
+                  <SelectItem value="wedding">💒 {t('Wedding Venue', 'قاعة أفراح')}</SelectItem>
+                  <SelectItem value="funeral">🕌 {t('Dar Monasbat', 'دار مناسبات')}</SelectItem>
+                  <SelectItem value="event_hall">🏛️ {t('Event Hall', 'قاعة فعاليات')}</SelectItem>
+                  <SelectItem value="photographer">📷 {t('Photographer', 'مصور فوتوغرافي')}</SelectItem>
+                  <SelectItem value="videographer">🎥 {t('Videographer', 'مصور فيديو')}</SelectItem>
+                  <SelectItem value="makeup">💄 {t('Makeup Artist', 'فنان مكياج')}</SelectItem>
+                  <SelectItem value="planner">📋 {t('Wedding Planner', 'منظم أفراح')}</SelectItem>
+                  <SelectItem value="decor">🌸 {t('Decor', 'ديكور')}</SelectItem>
+                  <SelectItem value="hair_styling">💇 {t('Hair Styling', 'تصفيف شعر')}</SelectItem>
+                  <SelectItem value="catering">🍽️ {t('Catering', 'تقديم طعام')}</SelectItem>
+                  <SelectItem value="photosession">📸 {t('Photo Session Places', 'أماكن جلسات تصوير')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {/* Price */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -296,7 +262,7 @@ export function HomeScreen() {
             </div>
           </div>
           <DrawerFooter className="px-8 pt-4 pb-12 gap-3">
-            <Button variant="outline" onClick={() => { setSelectedCity('All Cities'); setSelectedZone('All Zones'); setPriceRange([0, 500000]); setMinCapacity(0); }} className="h-12 rounded-2xl font-black uppercase tracking-widest text-sm">
+            <Button variant="outline" onClick={() => { setSelectedCity('All Cities'); setSelectedZone('All Zones'); setSelectedFilterCategory('all'); setPriceRange([0, 500000]); setMinCapacity(0); }} className="h-12 rounded-2xl font-black uppercase tracking-widest text-sm">
               {t('Reset Filters', 'إعادة الضبط')}
             </Button>
             <Button onClick={handleApplyFilters} className="h-16 rounded-[2rem] text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary/20">
@@ -309,7 +275,7 @@ export function HomeScreen() {
       {/* Categories Section */}
       <div className="px-6 mt-12">
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 animate-fade-up" style={{ animationDelay: '0.1s' }}>
           <div>
             <h3 className="text-2xl font-black tracking-tight text-foreground">{t('Categories', 'الأقسام')}</h3>
             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{t('Handpicked for you', 'مختارة بعناية لك')}</p>
@@ -326,7 +292,8 @@ export function HomeScreen() {
           {categories.filter(c => c.id !== 'other').map((cat) => (
             <Card
               key={cat.id}
-              className="relative overflow-hidden h-48 rounded-[2.5rem] border-none shadow-xl group cursor-pointer active:scale-95 transition-all"
+              className="relative overflow-hidden h-48 rounded-[2.5rem] border-none shadow-xl group cursor-pointer active:scale-95 transition-all animate-fade-up"
+              style={{ animationDelay: `${categories.filter(c => c.id !== 'other').indexOf(cat) * 0.08}s` }}
               onClick={() => navigate(`/search?category=${cat.id}`)}
             >
               <img
@@ -357,10 +324,11 @@ export function HomeScreen() {
             <div className="h-px bg-muted/50 flex-1 mx-4" />
           </div>
           <div className="grid grid-cols-4 gap-4">
-            {categories.find(c => c.id === 'other')?.subOptions?.slice(0, 8).map((opt) => (
+            {categories.find(c => c.id === 'other')?.subOptions?.slice(0, 12).map((opt) => (
               <button
                 key={opt.id}
-                className="flex flex-col items-center gap-3 group active:scale-90 transition-all"
+                className="flex flex-col items-center gap-3 group active:scale-90 transition-all animate-fade-up"
+                style={{ animationDelay: `${(categories.find(c => c.id === 'other')?.subOptions?.indexOf(opt) || 0) * 0.04}s` }}
                 onClick={() => navigate(`/search?category=${opt.id}`)}
               >
                 <div className="w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center shadow-md border border-primary/5 group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-xl group-hover:shadow-primary/20 transition-all duration-300">
@@ -450,7 +418,8 @@ export function HomeScreen() {
           {topRatedVenues.map((venue) => (
             <Card
               key={venue.id}
-              className="overflow-hidden cursor-pointer hover:shadow-lg transition-all border-none shadow-sm"
+              className="overflow-hidden cursor-pointer hover:shadow-lg transition-all border-none shadow-sm animate-fade-up"
+              style={{ animationDelay: `${topRatedVenues.indexOf(venue) * 0.06}s` }}
               onClick={() => navigate(`/venue/${venue.id}`)}
             >
               <div className="relative">
@@ -497,6 +466,19 @@ export function HomeScreen() {
             </Card>
           ))}
         </div>
+
+        {hasMore && (
+          <div className="flex justify-center pb-6">
+            <Button
+              variant="outline"
+              className="rounded-2xl px-8 h-12 font-black uppercase tracking-widest border-primary/20"
+              disabled={loadingMore}
+              onClick={async () => { setLoadingMore(true); await loadMoreVenues(); setLoadingMore(false); }}
+            >
+              {loadingMore ? t('Loading...', 'جاري التحميل...') : t('Load More', 'تحميل المزيد')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Bottom Navigation */}

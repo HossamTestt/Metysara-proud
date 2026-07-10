@@ -70,6 +70,8 @@ export function BookingConfirmationScreen() {
   const [booking, setBooking] = useState<any>(null);
   const [venue, setVenue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -110,20 +112,30 @@ export function BookingConfirmationScreen() {
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Error fetching booking data', e);
+        setError(e?.message || 'Failed to load booking');
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [id]);
+  }, [id, retryKey]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-muted-foreground text-sm">{t('Loading your booking...', 'جاري تحميل الحجز...')}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 gap-4">
+        <p className="text-destructive text-center font-bold">{error}</p>
+        <Button onClick={() => { setError(null); setLoading(true); setRetryKey(k => k + 1); }}>{t('Retry', 'إعادة المحاولة')}</Button>
       </div>
     );
   }

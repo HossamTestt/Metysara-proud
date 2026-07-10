@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router';
 import { useVenues } from '../context/VenuesContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -13,14 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { ArrowLeft, Calendar as CalendarIcon, Users, Plus, Minus, Package, MessageSquare, User, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
-const additionalServices = [
-  { id: 'photography', name: 'Professional Photography', nameAr: 'تصوير احترافي', price: 5000 },
-  { id: 'decoration', name: 'Premium Decoration', nameAr: 'ديكور فاخر', price: 8000 },
-  { id: 'catering', name: 'Premium Catering', nameAr: 'خدمة طعام فاخرة', price: 15000 },
-  { id: 'dj', name: 'DJ & Entertainment', nameAr: 'دي جي وترفيه', price: 7000 },
-  { id: 'flowers', name: 'Floral Arrangements', nameAr: 'تنسيق زهور', price: 6000 },
-  { id: 'lighting', name: 'Special Lighting', nameAr: 'إضاءة خاصة', price: 4000 },
-];
+import { additionalServices } from '../constants';
 
 export function BookingFlowScreen() {
   const { id } = useParams<{ id: string }>();
@@ -420,14 +413,14 @@ export function BookingFlowScreen() {
             </div>
 
             <div className="mt-6 flex items-start gap-3 p-4 bg-muted/30 rounded-xl border border-border">
-              <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked === true)} className="mt-0.5" />
+              <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked: boolean | string) => setAgreedToTerms(checked === true)} className="mt-0.5" />
               <div className="grid gap-1.5 leading-none">
                 <label htmlFor="terms" className="text-sm font-medium leading-none flex flex-wrap gap-1 items-center">
                   {t('I agree to the', 'أوافق على')}
                   <button 
                     type="button" 
                     className="text-primary hover:underline font-bold"
-                    onClick={(e) => { e.preventDefault(); setIsTermsModalOpen(true); }}
+                    onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsTermsModalOpen(true); }}
                   >
                      {t('Terms and Policies', 'الشروط والأحكام الخاصة بالمكان')}
                   </button>
